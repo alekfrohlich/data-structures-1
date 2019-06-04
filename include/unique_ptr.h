@@ -15,17 +15,20 @@ namespace mem {
 template <typename T>
 class unique_ptr {
 public:
+	// should be explicit to avoid Y-> X implicit conversion to rvalue
 	explicit unique_ptr(T* ptr) noexcept : raw_ptr(ptr) {}
-
-	// delete default constructor
-	unique_ptr() = delete;
 
 	// remove compiler generated copy semantics
 	unique_ptr(const unique_ptr& other) = delete;
 	unique_ptr& operator=(const unique_ptr& other) = delete;
 
-	// move semantics
-	unique_ptr(unique_ptr&& other) { swap(*this, other); }
+	// move constructor
+	unique_ptr(unique_ptr&& other) {
+		swap(*this, other);
+		other.raw_ptr = nullptr;
+	}
+
+	// move assignment: only bind to rvalues
 	unique_ptr& operator=(unique_ptr&& other) {
 		swap(*this, other);
 		return other;
@@ -38,8 +41,7 @@ public:
 	T* operator->() const noexcept { return raw_ptr; }
 	T& operator*() const { return *raw_ptr; }
 
-	// avoids implicit conversion from unique_ptr to bools not in bool
-	// expressions
+	// only bind to explicit use of unique_ptr as a boolean
 	explicit operator bool() const noexcept { return raw_ptr; }
 
 	// access method interface
@@ -52,15 +54,23 @@ public:
 		return ptr;
 	}
 
-	// delete early
-	void reset(T* ptr = nullptr) { delete release(); }
-
-	// overload std::swap
-	void swap(unique_ptr& uptr) { std::swap(raw_ptr, uptr.raw_ptr); }
+	// overload std::swap for the move-and-swap idiom
+	void swap(unique_ptr& uptr) noexcept {
+        std::swap(raw_ptr, uptr.raw_ptr);
+    }
 
 private:
 	T* raw_ptr;
 };
+/*
+template<typename T>
+inline unique_ptr<typename std::decay<T>::type>
+make_unique(T&& ptr) {
+    return unique_ptr<typename std::decay<T>::type>{ new std::decay<T>(std::forward
+}
+*/
+
 }  // namespace mem
 
 #endif
+
